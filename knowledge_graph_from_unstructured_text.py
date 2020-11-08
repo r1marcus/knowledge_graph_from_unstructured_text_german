@@ -1,8 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Nov  6 23:14:52 2020
-
-@author: marcu
 
 
 
