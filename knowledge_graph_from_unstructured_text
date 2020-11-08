@@ -1,0 +1,217 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Nov  6 23:14:52 2020
+
+@author: marcu
+
+
+# Importiere die Sprach-Klasse "German"
+from spacy.lang.de import German
+
+# Erstelle das nlp-Objekt
+nlp = German()
+
+# Erstellt durch Verarbeitung eines Strings mit dem nlp-Objekt
+doc = nlp("Hallo Welt!")
+
+# Iteriere über Tokens in einem Doc
+for token in doc:
+    print(token.text)
+    
+
+doc = nlp("Hallo Welt!")
+
+# Greife auf einen Token über seinen Index im Doc zu
+token = doc[1]
+
+# Erhalte den Text des Tokens über das Attribut .text
+print(token.text)
+
+doc = nlp("Hallo Welt!")
+
+# Ein Abschnitt des Doc-Objekts ist ein Span-Objekt
+span = doc[1:3]
+
+# Erhalte den Text der Span über das Attribut .text
+print(span.text)
+
+doc = nlp("Es kostet 5 €.")
+
+print("Index:   ", [token.i for token in doc])
+print("Text:    ", [token.text for token in doc])
+
+print("is_alpha:", [token.is_alpha for token in doc])
+print("is_punct:", [token.is_punct for token in doc])
+print("like_num:", [token.like_num for token in doc])    
+"""
+'''
+import spacy
+
+nlp = spacy.load("de_core_news_sm")
+
+# Verarbeite einen Text
+doc = nlp("Hallo ich bin Marcus")
+
+# Iteriere über die Tokens
+for token in doc:
+    # Drucke den text und die vorhergesagte Wortart
+    print(token.text, token.pos_)
+    
+for token in doc:
+    print(token.text, token.pos_, token.dep_, token.head.text)
+
+# Verarbeite einen Text
+doc = nlp("Marcus stellt in Villingen das neue Handy vor")
+
+# Iteriere über die vorhergesagten Entitäten
+for ent in doc.ents:
+    # Drucke den Text und das Label der Entität
+    print(ent.text, ent.label_)    
+'''
+
+
+import spacy
+
+
+'''
+# Importiere den Matcher
+from spacy.matcher import Matcher
+
+# Lade ein Modell und erstelle das nlp-Objekt
+nlp = spacy.load("de_core_news_sm")
+
+# Initialisiere den Matcher mit dem gemeinsamen Vokabular
+matcher = Matcher(nlp.vocab)
+
+# Füge das Pattern zum Matcher hinzu
+pattern = [{"TEXT": "iPhone"}, {"TEXT": "X"}]
+matcher.add("IPHONE_PATTERN", None, pattern)
+
+# Verarbeite einen Text
+doc = nlp("Das neue iPhone X erscheint demnächst in Deutschland")
+
+# Rufe den Matcher mit dem Doc auf
+matches = matcher(doc)
+
+# Rufe den Matcher mit dem Doc auf
+doc = nlp("Das neue iPhone X erscheint demnächst in Deutschland")
+matches = matcher(doc)
+
+# Iteriere über die Resultate
+for match_id, start, end in matches:
+    # Greife auf die gefundene Span zu
+    matched_span = doc[start:end]
+    print(matched_span.text)
+    
+pattern = [
+    {"IS_DIGIT": True},
+    {"LOWER": "fifa"},
+    {"LOWER": "world"},
+    {"LOWER": "cup"},
+    {"IS_PUNCT": True}
+]
+matcher.add("IPHONE_PATTERN", None, pattern)
+
+doc = nlp("2018 FIFA World Cup: Frankreich hat gewonnen!")    
+matches = matcher(doc)
+'''
+
+from spacy.lang.de import German
+import spacy
+from spacy.lang.en import English
+import networkx as nx
+import matplotlib.pyplot as plt
+
+def getSentences(text):
+    nlp = German()
+    nlp.add_pipe(nlp.create_pipe('sentencizer'))
+    document = nlp(text)
+    return [sent.string.strip() for sent in document.sents]
+
+def printToken(token):
+    print(token.text, "->", token.dep_)
+
+def appendChunk(original, chunk):
+    return original + ' ' + chunk
+
+def isRelationCandidate(token):
+    deps = ["ROOT","svp"]
+    #deps = ["ROOT", "adj", "attr", "agent", "amod"]
+    return any(subs in token.dep_ for subs in deps)
+
+def isConstructionCandidate(token):
+    #deps = ["adc"]
+    deps = ["op","nk"]
+    #deps = ["compound", "prep", "conj", "mod"] 
+    #2 zusammen gesetze wörter, 
+    return any(subs in token.dep_ for subs in deps)
+
+def processSubjectObjectPairs(tokens):
+    subject = ''
+    object = ''
+    relation = ''
+    subjectConstruction = ''
+    objectConstruction = ''
+    for token in tokens:
+        printToken(token)
+        if "punct" in token.dep_:
+            continue
+        if isRelationCandidate(token):
+            relation = appendChunk(relation, token.lemma_)
+        if isConstructionCandidate(token):
+            if subjectConstruction:
+                subjectConstruction = appendChunk(subjectConstruction, token.text)
+            if objectConstruction:
+                objectConstruction = appendChunk(objectConstruction, token.text)
+        if "ag" in token.dep_:
+            subject = appendChunk(subject, token.text)
+            subject = appendChunk(subjectConstruction, subject)
+            subjectConstruction = ''
+        if "oa" in token.dep_:
+            object = appendChunk(object, token.text)
+            object = appendChunk(objectConstruction, object)
+            objectConstruction = ''
+        if "sb" in token.dep_:
+            object = appendChunk(object, token.text)
+            object = appendChunk(objectConstruction, object)
+            objectConstruction = ''    
+
+    print (subject.strip(), ",", relation.strip(), ",", object.strip())
+    return (subject.strip(), relation.strip(), object.strip())
+
+def processSentence(sentence):
+    tokens = nlp_model(sentence)
+    return processSubjectObjectPairs(tokens)
+
+def printGraph(triples):
+    G = nx.Graph()
+    for triple in triples:
+        G.add_node(triple[0])
+        G.add_node(triple[1])
+        G.add_node(triple[2])
+        G.add_edge(triple[0], triple[1])
+        G.add_edge(triple[1], triple[2])
+
+    pos = nx.spring_layout(G)
+    plt.figure()
+    nx.draw(G, pos, edge_color='black', width=1, linewidths=1,
+            node_size=500, node_color='seagreen', alpha=0.9,
+            labels={node: node for node in G.nodes()})
+    plt.axis('off')
+    plt.show()
+
+if __name__ == "__main__":
+    #plt.rcParams['interactive'] == True
+    text= "Kundenkommunikation Der Umgang zur Kommunikation ist eine zentrale Voraussetzung der Dienstleistung, um die Kundenzufriedenheit zu gewährleisten. Die Kommunikationswege des von MiQ sollten für alle Kunden zur Verfügung stehen und auffindbar sein. Über die Webseite besteht die Möglichkeit MiQ über E-Mail, Telefon oder vor Ort an zu treffen. Die Verantwortung über die Kommunikation mit dem Kunden trägt dabei das Qualitätsmanagement (QM). Der Umgang mit dem Kunden führt nach der ersten erfolgreichen Kontaktaufnahme, meistens zu einem persönlichem Gespräch. In diesem Gespräch werden Rahmenbedingungen für das weitere Vorgehen festgelegt und Kundenanforderungen sowie die eigene Leistungsfähigkeit besprochen. Im Falle der Dienstleistungstätigkeiten wird das Dokument zur Beauftragung des Kunden herangezogen, um das Aufgabengebiet von MiQ schriftlich festzuhalten. Teil der Kundenkommunikation ist die Kundenzufriedenheit. Diese wird entsprechend der Richtlinie in regelmäßigen Abständen analysiert, um die Kundenanforderungen und wünsche laufend zu überwachen. Kundeneigentum Als Dienstleister gehen wir mit Kundeneigentum, insbesondere mit dem geistigen Eigentum unserer Kunden, sorgsam um. Alle Daten werden anhand entsprechender Gesetze geschützt und durch Datenverlust gesichert. Der komplexe Aufbau der Serverstruktur von Qsistant ermöglicht uns, jeden Kunden eine anonyme und abgekapselte Arbeitsumgebung zu schaffen. Verträge, Angebote und andere ausgedruckte kundenspezifische Unterlagen werden in einem Ordner und abgeschlossen aufbewahrt, um den Zugriff durch Dritte zu verhindern."
+    sentences = getSentences(text)
+    nlp_model = spacy.load('de_core_news_lg')
+
+    triples = []
+    print (text)
+    for sentence in sentences:
+        triples.append(processSentence(sentence))
+
+    printGraph(triples)
+
+
+
