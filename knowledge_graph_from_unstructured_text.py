@@ -1,6 +1,3 @@
-
-
-
 from spacy.lang.de import German
 import spacy
 from spacy.lang.en import English
